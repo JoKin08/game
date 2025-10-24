@@ -33,15 +33,41 @@ local cardsData = {
     action_cost = 2,
     damage = 3,
     hp = 3,
-    skill_text = "God - Ranged\\nAgility: When placed, deals 2 damage to each of two random enemy units."
+    skill_text = "God - Ranged\\n Agility: When placed, deals 2 damage to each of two random enemy units."
   }
 }
 
-function onLoad()
-    local pos = {x = 0, y = 2, z = 0}
-    for i, card in ipairs(cardsData) do
-        spawnCard(card, {pos.x + (i - 1) * 3, pos.y, pos.z})
-    end
+local player1Deck = {}
+local player2Deck = {}
+
+for _, card in ipairs(cardsData) do
+  table.insert(player1Deck, card)
+  table.insert(player1Deck, card)
+  table.insert(player2Deck, card)
+  table.insert(player2Deck, card)
+end
+
+function dealAll()
+  shuffle(player1Deck)
+  shuffle(player2Deck)
+  dealToPlayer(player1Deck, "White")
+  dealToPlayer(player2Deck, "Red")
+end
+
+function shuffle(tbl)
+  for i = #tbl, 2, -1 do
+    local j = math.random(i)
+    tbl[i], tbl[j] = tbl[j], tbl[i]
+  end
+end
+
+function dealToPlayer(deck, color)
+  local handPos = Player[color].getHandTransform().position
+  for i = 1, 5 do
+    local xOffset = (i - 3) * 2  
+    local pos = {handPos.x + xOffset, handPos.y + 2, handPos.z}
+    spawnCard(deck[i], pos)
+  end
 end
 
 function wrapAndCenter(text, maxLineLength)
