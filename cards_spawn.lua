@@ -25,6 +25,15 @@ local cardsData = {
     damage = 3,
     hp = 5,
     skill_text = "God - Melee"
+  },
+  {
+    name = "Artemis",
+    image_url = "https://github.com/JoKin08/game/blob/main/Assets/images_1.0/04%E9%98%BF%E5%B0%94%E5%BF%92%E5%BC%A5%E6%96%AF.png?raw=true",
+    placement_cost = 3,
+    action_cost = 2,
+    damage = 3,
+    hp = 3,
+    skill_text = "God - Ranged\\nAgility: When placed, deals 2 damage to each of two random enemy units."
   }
 }
 
@@ -35,7 +44,6 @@ function onLoad()
     end
 end
 
--- 自动换行并居中
 function wrapAndCenter(text, maxLineLength)
     local lines = {}
     local currentLine = ""
@@ -85,7 +93,6 @@ function spawnCard(data, position)
 end
 
 function generateCardScript(data)
-    -- 自动换行技能描述，限制每行最大32字符
     local formattedSkillText = wrapAndCenter(data.skill_text, 32)
 
     local script = [[
