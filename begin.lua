@@ -10,5 +10,5 @@ end
 
 function dealAll()
     dealCardsTo("White", 5) 
-    dealCardsTo("Red", 5)
+    dealCardsTo("Green", 5)
 end

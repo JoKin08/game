@@ -37,6 +37,9 @@ local cardsData = {
   }
 }
 
+
+playerColors = {"White", "Green"}
+
 local player1Deck = {}
 local player2Deck = {}
 
@@ -50,8 +53,8 @@ end
 function dealAll()
   shuffle(player1Deck)
   shuffle(player2Deck)
-  dealToPlayer(player1Deck, "White")
-  dealToPlayer(player2Deck, "Red")
+  dealToPlayer(player1Deck, playerColors[1])
+  dealToPlayer(player2Deck, playerColors[2])
 end
 
 function shuffle(tbl)
@@ -147,4 +150,48 @@ function generateCardScript(data)
         function noop() end
     ]]
     return script
+end
+
+
+
+currentTurn = 1
+turnPlayerIndex = 1
+
+playerEnergy = {
+    White = 1,
+    Green = 1
+}
+
+MAX_ENERGY = 15
+
+function endTurn()
+    -- 切换到下一个玩家
+    turnPlayerIndex = turnPlayerIndex % #playerColors + 1
+    local currentPlayer = playerColors[turnPlayerIndex]
+
+    -- 更新当前回合数（每轮完整双方行动后+1）
+    if turnPlayerIndex == 1 then
+        currentTurn = math.min(currentTurn + 1, MAX_ENERGY)
+    end
+
+    -- 设置新的能量值
+    local energyThisTurn = math.min(currentTurn, MAX_ENERGY)
+    playerEnergy[currentPlayer] = energyThisTurn
+
+    broadcastToAll("现在是 " .. currentPlayer .. " 的回合，获得能量：" .. energyThisTurn, {1, 1, 1})
+end
+
+energyTokens = {}  -- 保存 token 引用
+
+function onLoad()
+    playerColors = {"White", "Red"}
+    currentTurn = 1
+    turnPlayerIndex = 1
+    MAX_ENERGY = 15
+    playerEnergy = { White = 1, Red = 1 }
+
+    spawnEnergyToken("White", {-8, 1, 6})
+    spawnEnergyToken("Red",   {8, 1, 6})
+
+    updateAllEnergyDisplays()
 end
