@@ -165,33 +165,90 @@ playerEnergy = {
 MAX_ENERGY = 15
 
 function endTurn()
-    -- 切换到下一个玩家
     turnPlayerIndex = turnPlayerIndex % #playerColors + 1
     local currentPlayer = playerColors[turnPlayerIndex]
 
-    -- 更新当前回合数（每轮完整双方行动后+1）
     if turnPlayerIndex == 1 then
         currentTurn = math.min(currentTurn + 1, MAX_ENERGY)
     end
 
-    -- 设置新的能量值
     local energyThisTurn = math.min(currentTurn, MAX_ENERGY)
     playerEnergy[currentPlayer] = energyThisTurn
 
-    broadcastToAll("现在是 " .. currentPlayer .. " 的回合，获得能量：" .. energyThisTurn, {1, 1, 1})
+    broadcastToAll("现在是 " .. currentPlayer .. " 的回合，能量：" .. energyThisTurn, {1,1,1})
+
+    updateAllEnergyDisplays()
 end
+
+function consumeEnergy(playerColor, amount)
+    local energy = playerEnergy[playerColor] or 0
+    if energy < amount then
+        printToColor("能量不足，当前为 " .. energy .. "，需要 " .. amount, playerColor, {1,0,0})
+        return false
+    else
+        playerEnergy[playerColor] = energy - amount
+        updateEnergyDisplay(playerColor)
+        printToColor("已消耗 " .. amount .. " 能量，剩余：" .. playerEnergy[playerColor], playerColor, {0,1,0})
+        return true
+    end
+end
+
 
 energyTokens = {}  -- 保存 token 引用
 
 function onLoad()
-    playerColors = {"White", "Red"}
+    playerColors = {"White", "Green"}
     currentTurn = 1
     turnPlayerIndex = 1
     MAX_ENERGY = 15
-    playerEnergy = { White = 1, Red = 1 }
+    playerEnergy = { White = 1, Green = 1 }
 
-    spawnEnergyToken("White", {-8, 1, 6})
-    spawnEnergyToken("Red",   {8, 1, 6})
+    -- spawnEnergyToken("White", {-8, 1, 6})
+    -- spawnEnergyToken("Green",   {8, 1, 6})
 
-    updateAllEnergyDisplays()
 end
+
+-- 以下注释内容是由于White Energy方块上无法正常显示current/max，所以用广播代替
+-- function spawnEnergyToken(color, position)
+--     spawnObject({
+--         type = "Custom_Token",
+--         position = position,
+--         callback_function = function(obj)
+--             obj.setName(color .. " Energy")
+--             obj.setLock(true)
+--             obj.setColorTint(stringColorToRGB(color))
+--             obj.setScale({1.5, 0.2, 1.5})
+--             obj.setRotation({0, 0, 0})
+--             energyTokens[color] = obj
+--             updateEnergyDisplay(color)
+--         end
+--     })
+-- end
+
+
+function updateEnergyDisplay(color)
+    local token = energyTokens[color]
+    if not token then return end
+
+    local current = playerEnergy[color] or 0
+    local maxEnergy = math.min(currentTurn, MAX_ENERGY)
+
+    -- token.clearButtons()
+    -- token.createButton({
+    --     label = current .. " / " .. maxEnergy,
+    --     position = {0, 0.4, 0},
+    --     font_size = 250,
+    --     height = 200, width = 600,
+    --     color = {1, 1, 1, 0}, -- 背景透明
+    --     font_color = {1, 1, 1, 1},
+    --     click_function = "noop",           
+    --     function_owner = Global
+    -- })
+     broadcastToAll(color .. " 能量更新为 " .. current .. " / " .. maxEnergy, {1,1,1})
+end
+
+-- function updateAllEnergyDisplays()
+--     for _, color in ipairs(playerColors) do
+--         updateEnergyDisplay(color)
+--     end
+-- end
