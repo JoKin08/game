@@ -11,6 +11,8 @@ local cardsData = {
     damage = 1,
     hp = 2,
     move = 1,
+    type = "God",
+    skill_type = "Melee",
     skill_text = "God - Melee"
   },
   {
@@ -21,6 +23,8 @@ local cardsData = {
     damage = 1,
     hp = 3,
     move = 1,
+    type = "God",
+    skill_type = "Ranged",
     skill_text = "God - Ranged\n Romantic Curse: The attacked unit takes 1 unit less damage"
   },
   {
@@ -31,6 +35,8 @@ local cardsData = {
     damage = 3,
     hp = 5,
     move = 1,
+    type = "God",
+    skill_type = "Melee",
     skill_text = "God - Melee"
   },
   {
@@ -41,6 +47,8 @@ local cardsData = {
     damage = 3,
     hp = 3,
     move = 1,
+    type = "God",
+    skill_type = "Ranged",
     skill_text = "God - Ranged\n Agility: When placed, deals 2 damage to each of two random enemy units."
   }
 }

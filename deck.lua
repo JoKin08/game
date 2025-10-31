@@ -29,9 +29,16 @@ end
 
 function dealToPlayer(deck, color)
   local handPos = Player[color].getHandTransform().position
+  local counter = {}
+
   for i = 1, 5 do
     local xOffset = (i - 3) * 2  
     local pos = {handPos.x + xOffset, handPos.y + 2, handPos.z}
-    spawnCard(deck[i], pos)
+    
+    local cardData = deck[i]
+    counter[cardData.name] = (counter[cardData.name] or 0) + 1
+    local uniqueName = cardData.name .. "_" .. counter[cardData.name]
+
+    spawnCard(cardData, pos, uniqueName)
   end
 end

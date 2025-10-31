@@ -51,7 +51,7 @@ function generateCardScript(data)
     return script
 end
 
-function spawnCard(data, position)
+function spawnCard(data, position, uniqueName)
     local customCard = {
         Name = "Card",
         Transform = {
@@ -59,7 +59,7 @@ function spawnCard(data, position)
             rotX = 0, rotY = 180, rotZ = 0,
             scaleX = 1, scaleY = 1, scaleZ = 1
         },
-        Nickname = data.name,
+        Nickname = uniqueName,
         Description = data.skill_text,
         CardID = 100,
         CustomDeck = {
