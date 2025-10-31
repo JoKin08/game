@@ -238,7 +238,7 @@ local IMAGE_URLS = {
 -- === 主帅贴图 ===
 function spawnLeader(color, position)
     local image = color == "White" and IMAGE_URLS.zeusWhite or IMAGE_URLS.zeusGreen
-    local rotation = color == "White" and {0, 180, 0} or {0, 0, 0}
+    local rotation = color == "White" and {0, 0, 0} or {0, 180, 0}
 
     spawnObject({
         type = "Custom_Tile",
