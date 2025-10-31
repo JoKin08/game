@@ -45,6 +45,7 @@ local cardsData = {
   }
 }
 
+
 -- ===== card_renderer.lua =====
 -- card_renderer.lua
 -- 生成卡牌
@@ -129,50 +130,41 @@ end
 
 -- ===== deck.lua =====
 -- deck.lua
--- 初始化，发牌
+-- 这部分是初始化卡牌，选白绿是因为对桌
 
-local deck = {}
+playerColors = {"White", "Green"}
 
-local function shuffle(tbl)
-    for i = #tbl, 2, -1 do
-        local j = math.random(i)
-        tbl[i], tbl[j] = tbl[j], tbl[i]
-    end
+local player1Deck = {}
+local player2Deck = {}
+
+for _, card in ipairs(cardsData) do
+  table.insert(player1Deck, card)
+  table.insert(player1Deck, card)
+  table.insert(player2Deck, card)
+  table.insert(player2Deck, card)
 end
 
-local function generateDeck()
-    local player1Deck = {}
-    local player2Deck = {}
-
-    for _, card in ipairs(cardsData) do
-        table.insert(player1Deck, card)
-        table.insert(player1Deck, card)
-        table.insert(player2Deck, card)
-        table.insert(player2Deck, card)
-    end
-
-    shuffle(player1Deck)
-    shuffle(player2Deck)
-
-    return {
-        White = player1Deck,
-        Green = player2Deck
-    }
+function dealAll()
+  shuffle(player1Deck)
+  shuffle(player2Deck)
+  dealToPlayer(player1Deck, playerColors[1])
+  dealToPlayer(player2Deck, playerColors[2])
 end
 
-local function dealToPlayer(deck, color)
-    local handPos = Player[color].getHandTransform().position
-    for i = 1, 5 do
-        local xOffset = (i - 3) * 2
-        local pos = {handPos.x + xOffset, handPos.y + 2, handPos.z}
-        spawnCard(deck[i], pos)
-    end
+function shuffle(tbl)
+  for i = #tbl, 2, -1 do
+    local j = math.random(i)
+    tbl[i], tbl[j] = tbl[j], tbl[i]
+  end
 end
 
-local function dealAllPlayers(decks)
-    for _, color in ipairs({"White", "Green"}) do
-        dealToPlayer(decks[color], color)
-    end
+function dealToPlayer(deck, color)
+  local handPos = Player[color].getHandTransform().position
+  for i = 1, 5 do
+    local xOffset = (i - 3) * 2  
+    local pos = {handPos.x + xOffset, handPos.y + 2, handPos.z}
+    spawnCard(deck[i], pos)
+  end
 end
 
 -- ===== energy.lua =====
@@ -183,7 +175,6 @@ MAX_ENERGY = 15
 roundCount = 1
 phase = "white"
 
-playerColors = {"White", "Green"}
 playerEnergy = {
     White = 1,
     Green = 1
@@ -239,35 +230,52 @@ end
 -- ===== battlefield.lua =====
 -- battlefield.lua
 
+local IMAGE_URLS = {
+    zeusWhite = "https://github.com/JoKin08/game/blob/main/Assets/images_1.0/%E4%B8%BB%E5%B8%85_%E5%AE%99%E6%96%AF.png?raw=true",
+    zeusGreen = "https://github.com/JoKin08/game/blob/main/Assets/images_1.0/%E4%B8%BB%E5%B8%85_%E5%AE%99%E6%96%AF.png?raw=true"
+}
+
+-- === 主帅贴图 ===
 function spawnLeader(color, position)
+    local image = color == "White" and IMAGE_URLS.zeusWhite or IMAGE_URLS.zeusGreen
+    local rotation = color == "White" and {0, 180, 0} or {0, 0, 0}
+
     spawnObject({
-        type = "BlockSquare",
+        type = "Custom_Tile",
         position = position,
-        scale = {2.5, 0.4, 2.5},
+        rotation = rotation,
+        scale = {1, 1, 1},
         callback_function = function(obj)
-            obj.setName("Zeus" .. color .. " (20 HP)")
-            obj.setColorTint(stringColorToRGB(color))
             obj.setLock(true)
+            obj.setName("Zeus" .. color .. " (20 HP)")
+            obj.setCustomObject({
+                image = image,
+                type = 0
+            })
+            obj.reload()
         end
     })
 end
 
+-- === 准备区锚点（透明方块占位） ===
 function spawnPreparationSlots(color, count, z)
     for i = 1, count do
         local x = -4 + (i - 1) * 2
         spawnObject({
             type = "BlockSquare",
             position = {x = x, y = 1, z = z},
-            scale = {1.4, 0.2, 1.4},
+            scale = {1.2, 0.2, 1.2},
             callback_function = function(obj)
-                obj.setName(color .. "准备区 Slot " .. i)
-                obj.setColorTint(stringColorToRGB(color))
                 obj.setLock(true)
+                obj.setName(color .. "准备区 Slot " .. i)
+                obj.setColorTint({1, 1, 1, 0}) -- 完全透明
+                obj.setInvisibleTo({White = true, Green = true}) -- 双方不可见
             end
         })
     end
 end
 
+-- === 战道逻辑区域和 3D 文字 ===
 function spawnBattleLanes()
     local lanes = {
         {name = "神道", x = -4},
@@ -276,28 +284,57 @@ function spawnBattleLanes()
     }
 
     for _, lane in ipairs(lanes) do
+        -- 战道逻辑区：不可见长方形
         spawnObject({
             type = "BlockSquare",
             position = {x = lane.x, y = 1, z = 0},
-            scale = {1.5, 0.1, 3},
+            scale = {2.5, 0.2, 3},
             callback_function = function(obj)
-                obj.setName(lane.name)
-                obj.setColorTint({0.8, 0.8, 0.8}) -- 灰色
                 obj.setLock(true)
+                obj.setName("战道_" .. lane.name)
+                obj.setColorTint({1, 1, 1, 0}) -- 完全透明
+                obj.setInvisibleTo({White = true, Green = true})
             end
         })
 
-        -- 文字标签（可选）
+        -- 白方视角文字
         spawnObject({
             type = "3DText",
-            position = {x = lane.x, y = 1.3, z = 16.2},
+            position = {x = lane.x, y = 3.5, z = -4.5},
+            rotation = {0, 180, 0},
             callback_function = function(obj)
                 obj.TextTool.setValue(lane.name)
-                obj.TextTool.setFontSize(200)
+                obj.TextTool.setFontSize(100)
+                obj.TextTool.setFontColor({1, 1, 1})
+            end
+        })
+
+        -- 绿方视角文字
+        spawnObject({
+            type = "3DText",
+            position = {x = lane.x, y = 3.5, z = 4.5},
+            rotation = {0, 0, 0},
+            callback_function = function(obj)
+                obj.TextTool.setValue(lane.name)
+                obj.TextTool.setFontSize(100)
                 obj.TextTool.setFontColor({1, 1, 1})
             end
         })
     end
+end
+
+-- === 总初始化 ===
+function setupBattlefield()
+    -- 白方主帅与准备区
+    spawnLeader("White", {x = 0, y = 1, z = -10})
+    spawnPreparationSlots("White", 5, -6)
+
+    -- 战道
+    spawnBattleLanes()
+
+    -- 绿方准备区与主帅
+    spawnPreparationSlots("Green", 5, 6)
+    spawnLeader("Green", {x = 0, y = 1, z = 10})
 end
 
 

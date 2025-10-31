@@ -5,7 +5,6 @@ MAX_ENERGY = 15
 roundCount = 1
 phase = "white"
 
-playerColors = {"White", "Green"}
 playerEnergy = {
     White = 1,
     Green = 1

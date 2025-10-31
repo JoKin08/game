@@ -286,7 +286,7 @@ function spawnBattleLanes()
         -- 文字标签（可选）
         spawnObject({
             type = "3DText",
-            position = {x = lane.x, y = 1.3, z = 16.2},
+            position = {x = lane.x, y = 1.3, z = 0},
             callback_function = function(obj)
                 obj.TextTool.setValue(lane.name)
                 obj.TextTool.setFontSize(200)

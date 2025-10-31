@@ -1,46 +1,37 @@
 -- deck.lua
--- 初始化，发牌
+-- 这部分是初始化卡牌，选白绿是因为对桌
 
-local deck = {}
+playerColors = {"White", "Green"}
 
-local function shuffle(tbl)
-    for i = #tbl, 2, -1 do
-        local j = math.random(i)
-        tbl[i], tbl[j] = tbl[j], tbl[i]
-    end
+local player1Deck = {}
+local player2Deck = {}
+
+for _, card in ipairs(cardsData) do
+  table.insert(player1Deck, card)
+  table.insert(player1Deck, card)
+  table.insert(player2Deck, card)
+  table.insert(player2Deck, card)
 end
 
-local function generateDeck()
-    local player1Deck = {}
-    local player2Deck = {}
-
-    for _, card in ipairs(cardsData) do
-        table.insert(player1Deck, card)
-        table.insert(player1Deck, card)
-        table.insert(player2Deck, card)
-        table.insert(player2Deck, card)
-    end
-
-    shuffle(player1Deck)
-    shuffle(player2Deck)
-
-    return {
-        White = player1Deck,
-        Green = player2Deck
-    }
+function dealAll()
+  shuffle(player1Deck)
+  shuffle(player2Deck)
+  dealToPlayer(player1Deck, playerColors[1])
+  dealToPlayer(player2Deck, playerColors[2])
 end
 
-local function dealToPlayer(deck, color)
-    local handPos = Player[color].getHandTransform().position
-    for i = 1, 5 do
-        local xOffset = (i - 3) * 2
-        local pos = {handPos.x + xOffset, handPos.y + 2, handPos.z}
-        spawnCard(deck[i], pos)
-    end
+function shuffle(tbl)
+  for i = #tbl, 2, -1 do
+    local j = math.random(i)
+    tbl[i], tbl[j] = tbl[j], tbl[i]
+  end
 end
 
-local function dealAllPlayers(decks)
-    for _, color in ipairs({"White", "Green"}) do
-        dealToPlayer(decks[color], color)
-    end
+function dealToPlayer(deck, color)
+  local handPos = Player[color].getHandTransform().position
+  for i = 1, 5 do
+    local xOffset = (i - 3) * 2  
+    local pos = {handPos.x + xOffset, handPos.y + 2, handPos.z}
+    spawnCard(deck[i], pos)
+  end
 end
