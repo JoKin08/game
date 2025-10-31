@@ -153,60 +153,68 @@ function generateCardScript(data)
 end
 
 
-
-currentTurn = 1
-turnPlayerIndex = 1
+MAX_ENERGY = 15
+roundCount = 1
 
 playerEnergy = {
     White = 1,
     Green = 1
 }
+phase = "white"
 
-MAX_ENERGY = 15
+function onLoad()
+    broadcastToAll("游戏开始！白方先手。当前回合：" .. roundCount, {1,1,1})
+    showAllEnergies()
+end
 
-function endTurn()
-    turnPlayerIndex = turnPlayerIndex % #playerColors + 1
-    local currentPlayer = playerColors[turnPlayerIndex]
-
-    if turnPlayerIndex == 1 then
-        currentTurn = math.min(currentTurn + 1, MAX_ENERGY)
+function end1Turn(_, color)
+    if phase ~= "white" then
+        printToColor("现在不是你的回合！", color, {1, 0.2, 0.2})
+        return
     end
 
-    local energyThisTurn = math.min(currentTurn, MAX_ENERGY)
-    playerEnergy[currentPlayer] = energyThisTurn
-
-    broadcastToAll("现在是 " .. currentPlayer .. " 的回合，能量：" .. energyThisTurn, {1,1,1})
-
-    updateAllEnergyDisplays()
+    phase = "green"
+    local greenEnergy = math.min(roundCount, MAX_ENERGY)
+    playerEnergy["Green"] = greenEnergy
+    broadcastToAll("轮到绿方行动，本回合为第 " .. roundCount .. " 回合", {0.2,1,0.2})
+    showAllEnergies()
 end
+
+function end2Turn(_, color)
+    if phase ~= "green" then
+        printToColor("现在不是你的回合！", color, {1, 0.2, 0.2})
+        return
+    end
+
+    roundCount = roundCount + 1
+    phase = "white"
+    local whiteEnergy = math.min(roundCount, MAX_ENERGY)
+    playerEnergy["White"] = whiteEnergy
+    broadcastToAll("进入第 " .. roundCount .. " 回合，轮到白方行动", {1,1,1})
+    showAllEnergies()
+end
+
+function showAllEnergies()
+    local currentColor = (phase == "white") and "White" or "Green"
+    local current = playerEnergy[currentColor] or 0
+    local max = math.min(roundCount, MAX_ENERGY)
+    broadcastToAll(currentColor .. " 当前能量：" .. current .. " / " .. max, stringColorToRGB(currentColor))
+end
+
 
 function consumeEnergy(playerColor, amount)
     local energy = playerEnergy[playerColor] or 0
     if energy < amount then
-        printToColor("能量不足，当前为 " .. energy .. "，需要 " .. amount, playerColor, {1,0,0})
+        printToColor("能量不足，当前为 " .. energy .. "，需要 " .. amount, playerColor, {1, 0.2, 0.2})
         return false
     else
         playerEnergy[playerColor] = energy - amount
-        updateEnergyDisplay(playerColor)
-        printToColor("已消耗 " .. amount .. " 能量，剩余：" .. playerEnergy[playerColor], playerColor, {0,1,0})
+        printToColor("已消耗 " .. amount .. " 能量，剩余：" .. playerEnergy[playerColor], playerColor, {0.2, 1, 0.2})
         return true
     end
 end
 
 
-energyTokens = {}  -- 保存 token 引用
-
-function onLoad()
-    playerColors = {"White", "Green"}
-    currentTurn = 1
-    turnPlayerIndex = 1
-    MAX_ENERGY = 15
-    playerEnergy = { White = 1, Green = 1 }
-
-    -- spawnEnergyToken("White", {-8, 1, 6})
-    -- spawnEnergyToken("Green",   {8, 1, 6})
-
-end
 
 -- 以下注释内容是由于White Energy方块上无法正常显示current/max，所以用广播代替
 -- function spawnEnergyToken(color, position)
@@ -226,12 +234,12 @@ end
 -- end
 
 
-function updateEnergyDisplay(color)
-    local token = energyTokens[color]
-    if not token then return end
+-- function updateEnergyDisplay(color)
+--     local token = energyTokens[color]
+--     if not token then return end
 
-    local current = playerEnergy[color] or 0
-    local maxEnergy = math.min(currentTurn, MAX_ENERGY)
+--     local current = playerEnergy[color] or 0
+--     local maxEnergy = math.min(currentTurn, MAX_ENERGY)
 
     -- token.clearButtons()
     -- token.createButton({
@@ -244,8 +252,8 @@ function updateEnergyDisplay(color)
     --     click_function = "noop",           
     --     function_owner = Global
     -- })
-     broadcastToAll(color .. " 能量更新为 " .. current .. " / " .. maxEnergy, {1,1,1})
-end
+--      broadcastToAll(color .. " 能量更新为 " .. current .. " / " .. maxEnergy, {1,1,1})
+-- end
 
 -- function updateAllEnergyDisplays()
 --     for _, color in ipairs(playerColors) do

@@ -3,7 +3,7 @@ function onLoad()
         label = "Start",
         click_function = "dealAll",
         function_owner = Global,
-        position = {0, 0.3, 0},
+        position = {0, 1.2, 0},
         width = 1600, height = 500, font_size = 250
     })
 end
