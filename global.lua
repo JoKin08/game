@@ -85,10 +85,18 @@ function generateCardScript(data)
             placement_cost = ]] .. data.placement_cost .. [[,
             action_cost = ]] .. data.action_cost .. [[,
             damage = ]] .. data.damage .. [[,
-            hp = ]] .. data.hp .. [[
+            hp = ]] .. data.hp .. [[,
+            move = ]] .. data.move .. [[,
+            type = "]] .. data.type .. [[",
+            skill_type = "]] .. data.skill_type .. [["
         }
 
         function onLoad()
+            -- 显示基础数值
+            print("卡牌加载成功：" .. self.getName())
+
+            self.setVar("stats", stats)
+
             self.createButton({
                 label = "Cost: " .. stats.placement_cost .. "  Action: " .. stats.action_cost ..
                         "\nDamage: " .. stats.damage .. "  HP: " .. stats.hp,
@@ -96,19 +104,78 @@ function generateCardScript(data)
                 position = {0, 0.3, -1.2}, height = 0, width = 0, font_size = 90
             })
 
+            -- 技能描述
             self.createButton({
                 label = "]] .. formattedSkillText:gsub("\n", "\\n") .. [[",
                 click_function = "noop", function_owner = self,
                 position = {0, 0.3, 1.0}, height = 0, width = 0, font_size = 70
             })
+
+            -- 出牌点击按钮（透明覆盖整张卡）
+            self.createButton({
+                click_function = "onClickPlay",
+                function_owner = self,
+                label = "",
+                position = {0, 0.3, 0},
+                width = 1600, height = 2200,
+                color = {0,0,0,0}, font_color = {0,0,0,0},
+                tooltip = "点击以出牌"
+            })
         end
 
         function noop() end
+
+        -- 点击测试
+        function onClicked(player_color)
+            print("111")
+        end
+
+        -- 真正的点击效果
+        function onClickPlay(_, player_color)
+            Global.call("onCardClicked", {player_color, self})
+        end
+
+        function getPlacementCost()
+            return stats.placement_cost
+        end
+
+        function getActionCost()
+            return stats.action_cost
+        end
+
+        function getDamage()
+            return stats.damage
+        end
+
+        function getHP()
+            return stats.hp
+        end
+
+        function getMove()
+            return stats.move
+        end
+
+        function getType()
+            return stats.type
+        end
+
+        function getSkillType()
+            return stats.skill_type
+        end
+
+        function setCardInfo(info)
+            self.setVar("cardInfo", info)
+        end
+
+        function getCardInfo()
+            return self.getVar("cardInfo")
+        end
+
     ]]
     return script
 end
 
-function spawnCard(data, position)
+function spawnCard(data, position, uniqueName)
     local customCard = {
         Name = "Card",
         Transform = {
@@ -116,7 +183,7 @@ function spawnCard(data, position)
             rotX = 0, rotY = 180, rotZ = 0,
             scaleX = 1, scaleY = 1, scaleZ = 1
         },
-        Nickname = data.name,
+        Nickname = uniqueName,
         Description = data.skill_text,
         CardID = 100,
         CustomDeck = {
@@ -133,6 +200,91 @@ function spawnCard(data, position)
     }
 
     spawnObjectJSON({json = JSON.encode(customCard)})
+end
+
+
+-- ===== place.lua =====
+-- place.lua
+-- 从手牌出到准备区
+
+function onCardClicked(params)
+    local player_color = params[1]
+    local card = params[2]
+
+    -- 1. 回合验证
+    if (phase == "white" and player_color ~= "White") or (phase == "green" and player_color ~= "Green") then
+        printToColor("不是你的回合！", player_color, {1, 0.2, 0.2})
+        return
+    end
+
+    -- 2. 获取卡牌费用
+    local ok, cost = pcall(function() return card.call("getPlacementCost") end)
+    if not ok or not cost then
+        printToColor("读取卡牌费用失败", player_color, {1, 0.2, 0.2})
+        return
+    end
+
+    -- 3. 检查能量是否足够
+    if not consumeEnergy(player_color, cost) then
+        return
+    end
+
+    -- 4. 找一个空的准备区slot
+    local slot = findEmptyPrepSlot(player_color)
+    if not slot then
+        printToColor("准备区已满，无法出牌", player_color, {1, 0.2, 0.2})
+        return
+    end
+
+    -- 5. 移动卡牌到准备区（假设已手动从手牌拖出）
+    local dest = slot.getPosition()
+    dest.y = dest.y + 1.0
+    card.setPositionSmooth(dest, false, true)
+    card.setRotationSmooth({0, 180, 0}, false, true)
+
+    -- 6. 设置卡牌状态信息（出牌算一次移动）
+    local stats = card.getVar("stats")
+    if not stats then
+        printToColor("卡牌数据未初始化", player_color, {1, 0.2, 0.2})
+        return
+    end
+
+    local remaining = math.max((stats.move or 0) - 1, 0)
+    local info = {
+        owner = player_color,
+        remaining_move = remaining
+    }
+
+    -- 调用卡牌自己的 setCardInfo 方法
+    card.call("setCardInfo", info)
+
+    printToColor("已成功出牌：" .. card.getName(), player_color, {0.3, 1, 0.3})
+end
+
+
+
+-- === 找空的准备区 Slot ===
+function findEmptyPrepSlot(player_color)
+    local prefix = player_color .. "准备区 Slot"
+    for _, obj in ipairs(getAllObjects()) do
+        if obj.getName():find(prefix) then
+            local pos = obj.getPosition()
+            local occupied = false
+
+            for _, o in ipairs(getAllObjects()) do
+                local p = o.getPosition()
+                if o.tag == "Card" and math.abs(p.x - pos.x) < 0.6 and math.abs(p.z - pos.z) < 0.6 then
+                    occupied = true
+                    break
+                end
+            end
+
+            if not occupied then
+                return obj
+            end
+        end
+    end
+    return nil
 end
 
 
@@ -168,10 +320,17 @@ end
 
 function dealToPlayer(deck, color)
   local handPos = Player[color].getHandTransform().position
+  local counter = {}
+
   for i = 1, 5 do
     local xOffset = (i - 3) * 2  
     local pos = {handPos.x + xOffset, handPos.y + 2, handPos.z}
-    spawnCard(deck[i], pos)
+    
+    local cardData = deck[i]
+    counter[cardData.name] = (counter[cardData.name] or 0) + 1
+    local uniqueName = cardData.name .. "_" .. counter[cardData.name]
+
+    spawnCard(cardData, pos, uniqueName)
   end
 end
 

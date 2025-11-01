@@ -28,10 +28,18 @@ function generateCardScript(data)
             placement_cost = ]] .. data.placement_cost .. [[,
             action_cost = ]] .. data.action_cost .. [[,
             damage = ]] .. data.damage .. [[,
-            hp = ]] .. data.hp .. [[
+            hp = ]] .. data.hp .. [[,
+            move = ]] .. data.move .. [[,
+            type = "]] .. data.type .. [[",
+            skill_type = "]] .. data.skill_type .. [["
         }
 
         function onLoad()
+            -- 显示基础数值
+            print("卡牌加载成功：" .. self.getName())
+
+            self.setVar("stats", stats)
+
             self.createButton({
                 label = "Cost: " .. stats.placement_cost .. "  Action: " .. stats.action_cost ..
                         "\nDamage: " .. stats.damage .. "  HP: " .. stats.hp,
@@ -39,14 +47,73 @@ function generateCardScript(data)
                 position = {0, 0.3, -1.2}, height = 0, width = 0, font_size = 90
             })
 
+            -- 技能描述
             self.createButton({
                 label = "]] .. formattedSkillText:gsub("\n", "\\n") .. [[",
                 click_function = "noop", function_owner = self,
                 position = {0, 0.3, 1.0}, height = 0, width = 0, font_size = 70
             })
+
+            -- 出牌点击按钮（透明覆盖整张卡）
+            self.createButton({
+                click_function = "onClickPlay",
+                function_owner = self,
+                label = "",
+                position = {0, 0.3, 0},
+                width = 1600, height = 2200,
+                color = {0,0,0,0}, font_color = {0,0,0,0},
+                tooltip = "点击以出牌"
+            })
         end
 
         function noop() end
+
+        -- 点击测试
+        function onClicked(player_color)
+            print("111")
+        end
+
+        -- 真正的点击效果
+        function onClickPlay(_, player_color)
+            Global.call("onCardClicked", {player_color, self})
+        end
+
+        function getPlacementCost()
+            return stats.placement_cost
+        end
+
+        function getActionCost()
+            return stats.action_cost
+        end
+
+        function getDamage()
+            return stats.damage
+        end
+
+        function getHP()
+            return stats.hp
+        end
+
+        function getMove()
+            return stats.move
+        end
+
+        function getType()
+            return stats.type
+        end
+
+        function getSkillType()
+            return stats.skill_type
+        end
+
+        function setCardInfo(info)
+            self.setVar("cardInfo", info)
+        end
+
+        function getCardInfo()
+            return self.getVar("cardInfo")
+        end
+
     ]]
     return script
 end

@@ -2,6 +2,7 @@
 file_order = [
     "cards.lua",
     "card_renderer.lua",
+    "place.lua",
     "deck.lua",
     "energy.lua",
     "battlefield.lua",
