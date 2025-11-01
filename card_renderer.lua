@@ -39,6 +39,12 @@ function generateCardScript(data)
 
             self.setVar("stats", stats)
 
+            if not self.getVar("cardInfo") then
+                self.setVar("cardInfo", {
+                    remaining_move = stats.move
+                })
+            end
+
             self.createButton({
                 label = "Cost: " .. stats.placement_cost .. "  Action: " .. stats.action_cost ..
                         "\nDamage: " .. stats.damage .. "  HP: " .. stats.hp,
@@ -54,7 +60,6 @@ function generateCardScript(data)
 
             -- 点击按钮（初始是出牌）
             self.createButton({
-                index = 99,
                 click_function = "onClickPlay",
                 function_owner = self,
                 label = "",
