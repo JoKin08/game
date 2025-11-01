@@ -6,6 +6,9 @@ function onLoad()
 
     setupBattlefield()
 
+    setVarGlobal("White_leader_hp", 20)
+    setVarGlobal("Green_leader_hp", 20)
+
 end
 
 cardRegistry = {}
@@ -55,4 +58,12 @@ function debugPrintCardRegistry()
     for card, info in pairs(cardRegistry) do
         printToAll(card.getName() .. " | 所属: " .. info.owner .. " | 区域: " .. info.zone .. " | 战道: " .. tostring(info.lane), {1,1,1})
     end
+end
+
+function getVarGlobal(key)
+    return Global.getVar(key)
+end
+
+function setVarGlobal(key, value)
+    Global.setVar(key, value)
 end

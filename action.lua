@@ -193,9 +193,10 @@ end
 -- 主帅受到直接攻击
 function damageLeader(player_color, dmg)
     local key = player_color .. "_leader_hp"
+    print(key)
     local current = getVarGlobal(key) or 30
     setVarGlobal(key, current - dmg)
-    printToAll(player_color .. " 主帅受到 " .. dmg .. " 点伤害！", {1,0.4,0.4})
+    printToAll(player_color .. " 主帅受到 " .. dmg .. " 点伤害！剩余血量" .. getVarGlobal(key) .. ".", {1,0.4,0.4})
 end
 
 -- 工具函数：卡牌在哪个区域

@@ -782,9 +782,10 @@ end
 -- 主帅受到直接攻击
 function damageLeader(player_color, dmg)
     local key = player_color .. "_leader_hp"
+    print(key)
     local current = getVarGlobal(key) or 30
     setVarGlobal(key, current - dmg)
-    printToAll(player_color .. " 主帅受到 " .. dmg .. " 点伤害！", {1,0.4,0.4})
+    printToAll(player_color .. " 主帅受到 " .. dmg .. " 点伤害！剩余血量" .. getVarGlobal(key) .. ".", {1,0.4,0.4})
 end
 
 -- 工具函数：卡牌在哪个区域
@@ -887,6 +888,9 @@ function onLoad()
 
     setupBattlefield()
 
+    setVarGlobal("White_leader_hp", 20)
+    setVarGlobal("Green_leader_hp", 20)
+
 end
 
 cardRegistry = {}
@@ -936,6 +940,14 @@ function debugPrintCardRegistry()
     for card, info in pairs(cardRegistry) do
         printToAll(card.getName() .. " | 所属: " .. info.owner .. " | 区域: " .. info.zone .. " | 战道: " .. tostring(info.lane), {1,1,1})
     end
+end
+
+function getVarGlobal(key)
+    return Global.getVar(key)
+end
+
+function setVarGlobal(key, value)
+    Global.setVar(key, value)
 end
 
 
