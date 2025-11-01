@@ -19,6 +19,9 @@ function end1Turn(_, color)
     phase = "green"
     local greenEnergy = math.min(roundCount, MAX_ENERGY)
     playerEnergy["Green"] = greenEnergy
+
+    resetAllCardMovement("Green")
+
     broadcastToAll("轮到绿方行动，本回合为第 " .. roundCount .. " 回合", {0.2, 1, 0.2})
     showAllEnergies()
 end
@@ -33,6 +36,9 @@ function end2Turn(_, color)
     phase = "white"
     local whiteEnergy = math.min(roundCount, MAX_ENERGY)
     playerEnergy["White"] = whiteEnergy
+
+    resetAllCardMovement("White")
+    
     broadcastToAll("进入第 " .. roundCount .. " 回合，轮到白方行动", {1, 1, 1})
     showAllEnergies()
 end

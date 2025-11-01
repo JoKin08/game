@@ -53,6 +53,14 @@ function onCardClicked(params)
     card.call("setCardInfo", info)
 
     printToColor("已成功出牌：" .. card.getName(), player_color, {0.3, 1, 0.3})
+
+    Wait.time(function()
+        card.call("updateClickFunction", "onClickMove")
+    end, 0.5) 
+
+    registerCard(card, player_color, "prep", nil, slot.getName())
+
+
 end
 
 

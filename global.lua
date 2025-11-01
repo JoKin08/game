@@ -92,7 +92,6 @@ function generateCardScript(data)
         }
 
         function onLoad()
-            -- 显示基础数值
             print("卡牌加载成功：" .. self.getName())
 
             self.setVar("stats", stats)
@@ -104,15 +103,15 @@ function generateCardScript(data)
                 position = {0, 0.3, -1.2}, height = 0, width = 0, font_size = 90
             })
 
-            -- 技能描述
             self.createButton({
                 label = "]] .. formattedSkillText:gsub("\n", "\\n") .. [[",
                 click_function = "noop", function_owner = self,
                 position = {0, 0.3, 1.0}, height = 0, width = 0, font_size = 70
             })
 
-            -- 出牌点击按钮（透明覆盖整张卡）
+            -- 点击按钮（初始是出牌）
             self.createButton({
+                index = 99,
                 click_function = "onClickPlay",
                 function_owner = self,
                 label = "",
@@ -125,15 +124,48 @@ function generateCardScript(data)
 
         function noop() end
 
-        -- 点击测试
         function onClicked(player_color)
             print("111")
         end
 
-        -- 真正的点击效果
         function onClickPlay(_, player_color)
             Global.call("onCardClicked", {player_color, self})
         end
+
+        function onClickMove(_, player_color)
+            Global.call("onCardMoveAttempt", {player_color, self})
+        end
+
+        function onClickAction(_, player_color)
+            local info = self.call("getCardInfo")
+            if not info or info.owner ~= player_color then
+                printToColor("只能操作你的单位", player_color, {1, 0.2, 0.2})
+                return
+            end
+            Global.call("onBattleUnitClicked", {player_color, self})
+        end
+
+        function updateClickFunction(newFunc)
+            local buttons = self.getButtons()
+            if not buttons then
+                print("no buttons found on the card")
+                return
+            end
+
+            for _, btn in ipairs(buttons) do
+                if btn.index == 2 then
+                    self.editButton({
+                        index = 2,
+                        click_function = newFunc
+                    })
+                    print("have changed click function" .. newFunc)
+                    return
+                end
+            end
+
+            print("can't find button 2")
+        end
+
 
         function getPlacementCost()
             return stats.placement_cost
@@ -171,9 +203,18 @@ function generateCardScript(data)
             return self.getVar("cardInfo")
         end
 
+        function updateDisplay()
+            self.editButton({
+                index = 0,  -- 数值按钮是第一个 createButton 添加的，index = 0
+                label = "Cost: " .. stats.placement_cost .. "  Action: " .. stats.action_cost ..
+                        "\nDamage: " .. stats.damage .. "  HP: " .. stats.hp
+            })
+        end
+
     ]]
     return script
 end
+
 
 function spawnCard(data, position, uniqueName)
     local customCard = {
@@ -201,6 +242,8 @@ function spawnCard(data, position, uniqueName)
 
     spawnObjectJSON({json = JSON.encode(customCard)})
 end
+
+
 
 
 -- ===== place.lua =====
@@ -259,6 +302,14 @@ function onCardClicked(params)
     card.call("setCardInfo", info)
 
     printToColor("已成功出牌：" .. card.getName(), player_color, {0.3, 1, 0.3})
+
+    Wait.time(function()
+        card.call("updateClickFunction", "onClickMove")
+    end, 0.5) 
+
+    registerCard(card, player_color, "prep", nil, slot.getName())
+
+
 end
 
 
@@ -356,6 +407,9 @@ function end1Turn(_, color)
     phase = "green"
     local greenEnergy = math.min(roundCount, MAX_ENERGY)
     playerEnergy["Green"] = greenEnergy
+
+    resetAllCardMovement("Green")
+
     broadcastToAll("轮到绿方行动，本回合为第 " .. roundCount .. " 回合", {0.2, 1, 0.2})
     showAllEnergies()
 end
@@ -370,6 +424,9 @@ function end2Turn(_, color)
     phase = "white"
     local whiteEnergy = math.min(roundCount, MAX_ENERGY)
     playerEnergy["White"] = whiteEnergy
+
+    resetAllCardMovement("White")
+    
     broadcastToAll("进入第 " .. roundCount .. " 回合，轮到白方行动", {1, 1, 1})
     showAllEnergies()
 end
@@ -505,6 +562,206 @@ function setupBattlefield()
 end
 
 
+-- ===== turn.lua =====
+-- turn.lua
+-- 移动点重置
+
+function resetAllCardMovement(player_color)
+    for _, obj in ipairs(getAllObjects()) do
+        if obj.tag == "Card" then
+            local info = obj.call("getCardInfo")
+            local stats = obj.getVar("stats")
+            if info and stats and info.owner == player_color then
+                info.remaining_move = stats.move or 0
+                obj.call("setCardInfo", info)
+                printToColor("卡牌 " .. obj.getName() .. " 移动点数已重置为 " .. info.remaining_move, player_color, {0.6, 0.9, 1})
+            end
+        end
+    end
+end
+
+
+-- ===== action.lua =====
+-- action.lua
+-- 卡牌从准备区移动到战道，并处理战斗逻辑（含近战）
+
+function onCardMoveAttempt(params)
+    local player_color = params[1]
+    local card = params[2]
+
+    -- ✅ 回合检查
+    if (phase == "white" and player_color ~= "White") or
+       (phase == "green" and player_color ~= "Green") then
+        printToColor("不是你的回合", player_color, {1, 0.2, 0.2})
+        return
+    end
+
+    -- ✅ 读取卡牌数据
+    local stats = card.getVar("stats")
+    local info = card.call("getCardInfo")
+    if not stats or not info then
+        printToColor("卡牌数据未初始化", player_color, {1, 0.2, 0.2})
+        return
+    end
+
+    -- ✅ 检查剩余移动
+    if info.remaining_move <= 0 then
+        printToColor("该单位已无可用移动点", player_color, {1, 0.2, 0.2})
+        return
+    end
+
+    -- ✅ 扣除行动能量
+    local action_cost = stats.action_cost or 0
+    if not consumeEnergy(player_color, action_cost) then return end
+
+    -- ✅ 获取对应战道对象
+    local lane = findBattleLane(stats.type)
+    if not lane then
+        printToColor("未找到对应战道", player_color, {1, 0.2, 0.2})
+        return
+    end
+
+    -- ✅ 查找是否有敌方单位
+    local existingEnemy = findEnemyInLane(lane, player_color)
+    if existingEnemy then
+        local canEnter = resolveCombat(card, existingEnemy)
+        if not canEnter then
+            printToColor("你未能击败敌人，无法进入该战道", player_color, {1, 0.2, 0.2})
+            return
+        end
+    end
+
+    -- ✅ 确认是否能进入战道
+    if not canEnterLane(card, lane, player_color) then
+        printToColor("该战道格子不可进入", player_color, {1, 0.2, 0.2})
+        return
+    end
+
+    -- ✅ 执行移动
+    local dest = lane.getPosition()
+    dest.y = dest.y + 1.0
+    card.setPositionSmooth(dest, false, true)
+    card.setRotationSmooth({0, 180, 0})
+
+    info.remaining_move = info.remaining_move - 1
+    card.call("setCardInfo", info)
+
+    updateCardZone(card, "battle", stats.type, nil)
+
+    printToColor("已移动：" .. card.getName(), player_color, {0.3, 1, 0.3})
+end
+
+-- ✅ 将战道对象转换为字符串类型（God / Human / Ghost）
+function getCardTypeFromLaneObject(laneObject)
+    if not laneObject or not laneObject.getName then return nil end
+    local name = laneObject.getName()
+    if name:find("神道") then return "God"
+    elseif name:find("人道") then return "Human"
+    elseif name:find("灵道") then return "Ghost"
+    end
+    return nil
+end
+
+-- ✅ 根据类型找到战道对象
+function findBattleLane(card_type)
+    local mapping = {
+        God = "战道_神道",
+        Human = "战道_人道",
+        Ghost = "战道_灵道"
+    }
+    local targetName = mapping[card_type]
+    if not targetName then return nil end
+
+    for _, obj in ipairs(getAllObjects()) do
+        if obj.getName() == targetName then
+            return obj
+        end
+    end
+    return nil
+end
+
+-- ✅ 使用 cardRegistry 判断是否能进入战道
+function canEnterLane(card, lane, player_color)
+    local laneType = getCardTypeFromLaneObject(lane)
+    local friendly = 0
+    local enemy = 0
+
+    for otherCard, info in pairs(cardRegistry) do
+        if info.zone == "battle" and info.lane == laneType then
+            if info.owner == player_color then
+                friendly = friendly + 1
+            else
+                enemy = enemy + 1
+            end
+        end
+    end
+
+    printToColor("战道检测: " .. laneType .. " | 友军:" .. friendly .. " 敌军:" .. enemy, player_color, {1,1,0})
+    return friendly == 0 and enemy <= 1
+end
+
+-- ✅ 使用 cardRegistry 查找敌方单位
+function findEnemyInLane(lane, player_color)
+    local laneType = getCardTypeFromLaneObject(lane)
+    for card, info in pairs(cardRegistry) do
+        if info.zone == "battle" and info.lane == laneType and info.owner ~= player_color then
+            printToColor("发现敌方单位：" .. card.getName(), player_color, {1, 0.8, 0.2})
+            return card
+        end
+    end
+    return nil
+end
+
+-- ✅ 战斗逻辑
+function resolveCombat(attacker, defender)
+    local atkStats = attacker.getVar("stats")
+    local defStats = defender.getVar("stats")
+
+    local attackerName = attacker.getName()
+    local defenderName = defender.getName()
+
+    -- 攻击行为
+    defStats.hp = defStats.hp - atkStats.damage
+    printToAll(attackerName .. " 攻击 " .. defenderName .. "，造成 " .. atkStats.damage .. " 点伤害")
+
+    -- 如果敌人是近战单位，触发反击
+    if defStats.skill_type == "Melee" then
+        atkStats.hp = atkStats.hp - defStats.damage
+        printToAll(defenderName .. " 反击 " .. attackerName .. "，造成 " .. defStats.damage .. " 点伤害")
+    end
+
+    -- 判定双方是否死亡
+    local defDead = defStats.hp <= 0
+    local atkDead = atkStats.hp <= 0
+
+    if defDead then
+        printToAll(defenderName .. " 被击败", {1, 0.4, 0.4})
+        moveToGraveyard(defender)
+    else
+        defender.setVar("stats", defStats)
+        defender.call("updateDisplay")
+    end
+
+    if atkDead then
+        printToAll(attackerName .. " 被击败", {0.4, 0.4, 1})
+        moveToGraveyard(attacker)
+        return false
+    else
+        attacker.setVar("stats", atkStats)
+        attacker.call("updateDisplay")
+    end
+
+    return defDead
+end
+
+-- ✅ 将卡牌送入弃牌堆
+function moveToGraveyard(card)
+    local pos = card.getPosition()
+    card.setPositionSmooth({x = pos.x, y = 2, z = pos.z + 5})
+    unregisterCard(card)
+end
+
+
 -- ===== main.lua =====
 -- main.lua
 
@@ -512,13 +769,57 @@ function onLoad()
     broadcastToAll("游戏开始！白方先手。当前回合：1", {1,1,1})
     showAllEnergies()
 
-    spawnLeader("White", {x=0, y=1, z=10})
-    spawnLeader("Green", {x=0, y=1, z=-10})
+    setupBattlefield()
 
-    spawnPreparationSlots("White", 5, 8)
-    spawnPreparationSlots("Green", 5, -8)
+end
 
-    spawnBattleLanes()
+cardRegistry = {}
+
+-- 注册卡牌（首次上场）
+function registerCard(card, owner, zone, lane, slot)
+    cardRegistry[card] = {
+        owner = owner,
+        zone = zone,
+        lane = lane,
+        slot = slot
+    }
+    printToAll("注册卡牌：" .. card.getName() .. "，所属玩家：" .. owner, {0.5, 0.5, 1})
+    debugPrintCardRegistry()
+end
+
+-- 更新卡牌位置（例如从准备区进入战道）
+function updateCardZone(card, zone, lane, slot)
+    if cardRegistry[card] then
+        cardRegistry[card].zone = zone
+        cardRegistry[card].lane = lane
+        cardRegistry[card].slot = slot
+
+        printToAll("更新卡牌位置：" .. card.getName() .. "，区域：" .. zone .. "，战道：" .. tostring(lane) .. "，槽位：" .. tostring(slot), {0.5, 1, 0.5})
+    end
+end
+
+-- 移除卡牌（死亡进入弃牌堆）
+function unregisterCard(card)
+    cardRegistry[card] = nil
+    printToAll("移除卡牌注册：" .. card.getName(), {1, 0.5, 0.5})
+end
+
+-- 查询某区域单位（如准备区、某战道）
+function getUnitsInZone(owner, zone, lane)
+    local results = {}
+    for card, info in pairs(cardRegistry) do
+        if info.owner == owner and info.zone == zone and info.lane == lane then
+            table.insert(results, card)
+        end
+    end
+    return results
+end
+
+function debugPrintCardRegistry()
+    printToAll("==== 当前注册卡牌 ====", {1,1,0})
+    for card, info in pairs(cardRegistry) do
+        printToAll(card.getName() .. " | 所属: " .. info.owner .. " | 区域: " .. info.zone .. " | 战道: " .. tostring(info.lane), {1,1,1})
+    end
 end
 
 

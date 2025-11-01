@@ -6,6 +6,8 @@ file_order = [
     "deck.lua",
     "energy.lua",
     "battlefield.lua",
+    "turn.lua",
+    "action.lua",
     "main.lua"
 ]
 

@@ -35,7 +35,6 @@ function generateCardScript(data)
         }
 
         function onLoad()
-            -- 显示基础数值
             print("卡牌加载成功：" .. self.getName())
 
             self.setVar("stats", stats)
@@ -47,15 +46,15 @@ function generateCardScript(data)
                 position = {0, 0.3, -1.2}, height = 0, width = 0, font_size = 90
             })
 
-            -- 技能描述
             self.createButton({
                 label = "]] .. formattedSkillText:gsub("\n", "\\n") .. [[",
                 click_function = "noop", function_owner = self,
                 position = {0, 0.3, 1.0}, height = 0, width = 0, font_size = 70
             })
 
-            -- 出牌点击按钮（透明覆盖整张卡）
+            -- 点击按钮（初始是出牌）
             self.createButton({
+                index = 99,
                 click_function = "onClickPlay",
                 function_owner = self,
                 label = "",
@@ -68,15 +67,48 @@ function generateCardScript(data)
 
         function noop() end
 
-        -- 点击测试
         function onClicked(player_color)
             print("111")
         end
 
-        -- 真正的点击效果
         function onClickPlay(_, player_color)
             Global.call("onCardClicked", {player_color, self})
         end
+
+        function onClickMove(_, player_color)
+            Global.call("onCardMoveAttempt", {player_color, self})
+        end
+
+        function onClickAction(_, player_color)
+            local info = self.call("getCardInfo")
+            if not info or info.owner ~= player_color then
+                printToColor("只能操作你的单位", player_color, {1, 0.2, 0.2})
+                return
+            end
+            Global.call("onBattleUnitClicked", {player_color, self})
+        end
+
+        function updateClickFunction(newFunc)
+            local buttons = self.getButtons()
+            if not buttons then
+                print("no buttons found on the card")
+                return
+            end
+
+            for _, btn in ipairs(buttons) do
+                if btn.index == 2 then
+                    self.editButton({
+                        index = 2,
+                        click_function = newFunc
+                    })
+                    print("have changed click function" .. newFunc)
+                    return
+                end
+            end
+
+            print("can't find button 2")
+        end
+
 
         function getPlacementCost()
             return stats.placement_cost
@@ -114,9 +146,18 @@ function generateCardScript(data)
             return self.getVar("cardInfo")
         end
 
+        function updateDisplay()
+            self.editButton({
+                index = 0,  -- 数值按钮是第一个 createButton 添加的，index = 0
+                label = "Cost: " .. stats.placement_cost .. "  Action: " .. stats.action_cost ..
+                        "\nDamage: " .. stats.damage .. "  HP: " .. stats.hp
+            })
+        end
+
     ]]
     return script
 end
+
 
 function spawnCard(data, position, uniqueName)
     local customCard = {
@@ -144,3 +185,5 @@ function spawnCard(data, position, uniqueName)
 
     spawnObjectJSON({json = JSON.encode(customCard)})
 end
+
+
