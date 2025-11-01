@@ -1,3 +1,5 @@
+-- Buttons: 1数值 2卡面文字 3点击区域 4选择目标/ 4、5远程移动或攻击
+
 -- card_renderer.lua
 -- 生成卡牌
 function wrapAndCenter(text, maxLineLength)

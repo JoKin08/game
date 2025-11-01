@@ -30,13 +30,28 @@ function onCardMoveAttempt(params)
 
     local zone = getCardZone(card)
 
-    if zone == "prep" then
-        attemptEnterBattle(card, player_color)
-    elseif zone == "battle" then
-        attemptAttack(card, player_color)
-    else
-        printToColor("当前区域无法行动", player_color, {1, 0.2, 0.2})
+    -- 近战/远程分支
+    if stats.skill_type == "Melee" then
+        if zone == "prep" then
+            attemptEnterBattle(card, player_color)
+        elseif zone == "battle" then
+            attemptAttack(card, player_color)
+        else
+            printToColor("当前区域无法行动", player_color, {1, 0.2, 0.2})
+        end
+    elseif stats.skill_type == "Ranged" then
+        -- 选择移动还是攻击
+        if zone == "prep" then
+            showRangedActionChoice(card, player_color)
+        elseif zone == "battle" then
+            attemptAttack(card, player_color)
+        else
+            printToColor("当前区域无法行动", player_color, {1, 0.2, 0.2})
+        end
     end
+
+    clearAllSelectableButtons()
+
 end
 
 -- 从准备区进入战道
@@ -87,6 +102,8 @@ function attemptEnterBattle(card, player_color)
     moveCardToLane(card, lane, player_color)
     decrementMove(card)
     printToColor("你成功进入战道并占领该路", player_color, {0.3, 1, 0.3})
+
+    printToColor("战道单位数量：" .. tostring(#getUnitsInZone(enemyColor, "battle")), player_color, {1,1,1})
 end
 
 
@@ -133,9 +150,9 @@ function selectPrepTarget(prepTargets, player_color)
     for _, target in ipairs(prepTargets) do
         target.setVar("isSelectableTarget", true)
         target.createButton({
-            label = "被攻击", click_function = "onSelectedAsTarget",
+            label = "choose", click_function = "onSelectedAsTarget",
             function_owner = Global,
-            position = {0, 0.3, 0}, width = 1000, height = 1000,
+            position = {0, 2, -1.2}, width = 1000, height = 1000,
             font_size = 200, color = {1, 0.2, 0.2}
         })
     end
@@ -145,10 +162,15 @@ end
 function selectAllEnemyTargets(player_color)
     local enemyColor = (player_color == "White") and "Green" or "White"
     local allTargets = getUnitsInZone(enemyColor, "battle")
+    printToColor("战道单位数量：" .. tostring(#getUnitsInZone(enemyColor, "battle")), player_color, {1,1,1})
+
     for _, c in ipairs(getUnitsInZone(enemyColor, "prep")) do table.insert(allTargets, c) end
 
     if #allTargets == 0 then
         printToColor("敌方没有可攻击单位", player_color, {1,0.2,0.2})
+        printToColor("直接攻击敌方主帅！", player_color, {1,1,0})
+        damageLeader(enemyColor, pendingAttackSource.getVar("stats").damage)
+        pendingAttackSource = nil
         return
     end
 
@@ -156,9 +178,9 @@ function selectAllEnemyTargets(player_color)
     for _, target in ipairs(allTargets) do
         target.setVar("isSelectableTarget", true)
         target.createButton({
-            label = "被远程攻击", click_function = "onSelectedAsTarget",
+            label = "choose", click_function = "onSelectedAsTarget",
             function_owner = Global,
-            position = {0, 0.3, 0}, width = 1000, height = 1000,
+            position = {0, 5, -1.2}, width = 1000, height = 1000,
             font_size = 200, color = {0.2, 0.2, 1}
         })
     end
@@ -169,8 +191,9 @@ function resolveCombat(attacker, defender)
     local atkStats = attacker.getVar("stats")
     local defStats = defender.getVar("stats")
 
+    -- 只有近战单位会受到反击，远程单位则不会
     local atkDmg = atkStats.damage or 0
-    local defDmg = (defStats.skill_type == "Melee") and (defStats.damage or 0) or 0
+    local defDmg = (atkStats.skill_type == "Melee") and (defStats.damage or 0) or 0
 
     defStats.hp = defStats.hp - atkDmg
     atkStats.hp = atkStats.hp - defDmg
@@ -288,4 +311,81 @@ function moveToGraveyard(card)
     pos.y = pos.y + 2
     card.setPositionSmooth(pos)
     unregisterCard(card)
+end
+
+function onSelectedAsTarget(target, player_color)
+
+    local attacker = pendingAttackSource
+    if not attacker then
+        printToColor("未找到攻击来源", player_color, {1, 0.2, 0.2})
+        return
+    end
+
+    resolveCombat(attacker, target)
+
+    -- 清理选择状态
+    target.setVar("isSelectableTarget", false)
+    target.removeButton(3)  -- 我猜这是卡上的第四个按钮
+
+    pendingAttackSource = nil
+end
+
+-- 提供远程单位在准备区的行动选择
+function showRangedActionChoice(card, player_color)
+    printToColor("move or attack", player_color, {1,1,0})
+
+    card.createButton({
+        label = "move",
+        click_function = "onRangedMoveSelected",
+        function_owner = Global,
+        position = {0, 0.3, 0.8}, width = 1000, height = 500,
+        font_size = 200, color = {0.3, 0.8, 0.3}
+    })
+
+    card.createButton({
+        label = "attack",
+        click_function = "onRangedAttackSelected",
+        function_owner = Global,
+        position = {0, 0.3, 0.1}, width = 1000, height = 500,
+        font_size = 200, color = {0.8, 0.3, 0.3}
+    })
+
+    -- 设置标记用于点击按钮时识别
+    card.setVar("awaitingRangedChoice", true)
+end
+
+function onRangedMoveSelected(card, player_color)
+    if card.getVar("awaitingRangedChoice") then
+        card.setVar("awaitingRangedChoice", nil)
+        card.removeButton(3)
+        card.removeButton(4)
+        attemptEnterBattle(card, player_color)
+    end
+end
+
+function onRangedAttackSelected(card, player_color)
+    if card.getVar("awaitingRangedChoice") then
+        card.setVar("awaitingRangedChoice", nil)
+        card.removeButton(3)
+        card.removeButton(4)
+        selectAllEnemyTargets(player_color)
+        pendingAttackSource = card
+    end
+end
+
+-- 清除所有选择按钮（索引大于等于3的全部清掉）
+function clearAllSelectableButtons()
+    for card, info in pairs(cardRegistry) do
+        if card.getVar("isSelectableTarget") then
+            card.setVar("isSelectableTarget", false)
+            local buttons = card.getButtons()
+            if buttons then
+                for i = #buttons, 1, -1 do
+                    if i >= 3 then
+                        card.removeButton(i)
+                    end
+                end
+            end
+        end
+    end
 end

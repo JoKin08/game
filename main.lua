@@ -46,12 +46,16 @@ end
 function getUnitsInZone(owner, zone, lane)
     local results = {}
     for card, info in pairs(cardRegistry) do
-        if info.owner == owner and info.zone == zone and info.lane == lane then
-            table.insert(results, card)
+        if info.owner == owner and info.zone == zone then
+            -- 如果没有传 lane，则忽略 lane 检查
+            if (not lane) or (info.lane == lane) then
+                table.insert(results, card)
+            end
         end
     end
     return results
 end
+
 
 function debugPrintCardRegistry()
     printToAll("==== 当前注册卡牌 ====", {1,1,0})

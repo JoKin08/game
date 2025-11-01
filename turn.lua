@@ -14,3 +14,4 @@ function resetAllCardMovement(player_color)
         end
     end
 end
+
