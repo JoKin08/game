@@ -103,7 +103,7 @@ function attemptEnterBattle(card, player_color)
     decrementMove(card)
     printToColor("你成功进入战道并占领该路", player_color, {0.3, 1, 0.3})
 
-    printToColor("战道单位数量：" .. tostring(#getUnitsInZone(enemyColor, "battle")), player_color, {1,1,1})
+    printToColor("战道敌方单位数量：" .. tostring(#getUnitsInZone(enemyColor, "battle")), player_color, {1,1,1})
 end
 
 
@@ -122,26 +122,28 @@ function attemptAttack(card, player_color)
         if enemy then
             print("战道内攻击")
             resolveCombat(card, enemy)
+            decrementMove(card)
         elseif #prepTargets > 0 then
             print("准备区攻击")
             pendingAttackSource = card
             selectPrepTarget(prepTargets, player_color)
+            decrementMove(card)
         else
             printToAll(card.getName() .. " 直接攻击敌方主帅！", {1,0,0})
             damageLeader(enemyColor, stats.damage)
+            decrementMove(card)
         end
     elseif stats.skill_type == "Ranged" then
         if enemy or #prepTargets > 0 then
             pendingAttackSource = card
-            selectAllEnemyTargets(player_color)
+            selectAllEnemyTargets(card, player_color)
         else
             printToAll(card.getName() .. " 用远程攻击敌方主帅！", {1,0,0})
             damageLeader(enemyColor, stats.damage)
+            decrementMove(card)
         end
     end
 
-    info.remaining_move = info.remaining_move - 1
-    card.call("setCardInfo", info)
 end
 
 -- 敌方准备区选择
@@ -152,17 +154,17 @@ function selectPrepTarget(prepTargets, player_color)
         target.createButton({
             label = "choose", click_function = "onSelectedAsTarget",
             function_owner = Global,
-            position = {0, 2, -1.2}, width = 1000, height = 1000,
+            position = {-1.2, 2, -1.2}, width = 1000, height = 1000,
             font_size = 200, color = {1, 0.2, 0.2}
         })
     end
 end
 
 -- 敌方所有单位选择（远程）
-function selectAllEnemyTargets(player_color)
+function selectAllEnemyTargets(card, player_color)
     local enemyColor = (player_color == "White") and "Green" or "White"
     local allTargets = getUnitsInZone(enemyColor, "battle")
-    printToColor("战道单位数量：" .. tostring(#getUnitsInZone(enemyColor, "battle")), player_color, {1,1,1})
+    printToColor("战道敌方单位数量：" .. tostring(#getUnitsInZone(enemyColor, "battle")), player_color, {1,1,1})
 
     for _, c in ipairs(getUnitsInZone(enemyColor, "prep")) do table.insert(allTargets, c) end
 
@@ -171,6 +173,7 @@ function selectAllEnemyTargets(player_color)
         printToColor("直接攻击敌方主帅！", player_color, {1,1,0})
         damageLeader(enemyColor, pendingAttackSource.getVar("stats").damage)
         pendingAttackSource = nil
+        decrementMove(card)
         return
     end
 
@@ -180,7 +183,7 @@ function selectAllEnemyTargets(player_color)
         target.createButton({
             label = "choose", click_function = "onSelectedAsTarget",
             function_owner = Global,
-            position = {0, 5, -1.2}, width = 1000, height = 1000,
+            position = {-1.2, 5, -1.2}, width = 1000, height = 1000,
             font_size = 200, color = {0.2, 0.2, 1}
         })
     end
@@ -202,6 +205,10 @@ function resolveCombat(attacker, defender)
     defender.setVar("stats", defStats)
     attacker.call("updateDisplay")
     defender.call("updateDisplay")
+    printToAll(attacker.getName() .. " 对 " .. defender.getName() .. " 造成 " .. atkDmg .. " 点伤害", {1,1,0})
+    if defDmg > 0 then
+        printToAll(defender.getName() .. " 反击 " .. attacker.getName() .. " 造成 " .. defDmg .. " 点伤害", {1,1,0})
+    end
 
     if defStats.hp <= 0 then
         printToAll(defender.getName() .. " 被击败", {1, 0.2, 0.2})
@@ -211,6 +218,7 @@ function resolveCombat(attacker, defender)
         printToAll(attacker.getName() .. " 被反击击败", {0.2, 0.2, 1})
         moveToGraveyard(attacker)
     end
+
 end
 
 -- 主帅受到直接攻击
@@ -220,6 +228,9 @@ function damageLeader(player_color, dmg)
     local current = getVarGlobal(key) or 30
     setVarGlobal(key, current - dmg)
     printToAll(player_color .. " 主帅受到 " .. dmg .. " 点伤害！剩余血量" .. getVarGlobal(key) .. ".", {1,0.4,0.4})
+    if getVarGlobal(key) <= 0 then
+        printToAll(player_color .. " 主帅被击败！游戏结束！", {1,0,0})
+    end
 end
 
 -- 工具函数：卡牌在哪个区域
@@ -322,10 +333,13 @@ function onSelectedAsTarget(target, player_color)
     end
 
     resolveCombat(attacker, target)
+    decrementMove(attacker)
 
     -- 清理选择状态
     target.setVar("isSelectableTarget", false)
     target.removeButton(3)  -- 我猜这是卡上的第四个按钮
+
+    clearAllSelectableButtons()
 
     pendingAttackSource = nil
 end
@@ -368,7 +382,7 @@ function onRangedAttackSelected(card, player_color)
         card.setVar("awaitingRangedChoice", nil)
         card.removeButton(3)
         card.removeButton(4)
-        selectAllEnemyTargets(player_color)
+        selectAllEnemyTargets(card, player_color)
         pendingAttackSource = card
     end
 end
