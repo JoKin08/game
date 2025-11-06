@@ -166,7 +166,9 @@ function generateCardScript(data)
 end
 
 
-function spawnCard(data, position, uniqueName)
+function spawnCard(data, position, uniqueName, player_color)
+    local backURL = BACK_URLS[data.type] or BACK_URLS["Spell"]
+
     local customCard = {
         Name = "Card",
         Transform = {
@@ -180,14 +182,19 @@ function spawnCard(data, position, uniqueName)
         CustomDeck = {
             ["1"] = {
                 FaceURL = data.image_url,
-                BackURL = "https://github.com/JoKin08/game/blob/main/Assets/images_1.0/%E7%A5%9E.png?raw=true",
+                BackURL = backURL,
                 NumWidth = 1,
                 NumHeight = 1,
                 BackIsHidden = true
             }
         },
         LuaScript = generateCardScript(data),
-        LuaScriptState = ""
+        LuaScriptState = JSON.encode({
+            cardInfo = {
+                owner = player_color,
+                remaining_move = data.move
+            }
+        })
     }
 
     spawnObjectJSON({json = JSON.encode(customCard)})
